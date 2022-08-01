@@ -1064,7 +1064,24 @@ public class PBXProjGenerator {
             }
             return retval
         }
-        
+
+        func appendResoursesBuildPhase() {
+            let resourcesBuildPhaseFiles = getBuildFilesForPhase(.resources) + copyResourcesReferences
+            if !resourcesBuildPhaseFiles.isEmpty {
+                let resourcesBuildPhase = addObject(PBXResourcesBuildPhase(files: resourcesBuildPhaseFiles))
+                buildPhases.append(resourcesBuildPhase)
+            }
+        }
+
+        func appendSourcesBuildPhase() {
+            let sourcesBuildPhaseFiles = getBuildFilesForPhase(.sources)
+            let shouldSkipSourcesBuildPhase = sourcesBuildPhaseFiles.isEmpty && target.type.canSkipCompileSourcesBuildPhase
+            if !shouldSkipSourcesBuildPhase {
+                let sourcesBuildPhase = addObject(PBXSourcesBuildPhase(files: sourcesBuildPhaseFiles))
+                buildPhases.append(sourcesBuildPhase)
+            }
+        }
+
         copyFilesBuildPhasesFiles.merge(getBuildFilesForCopyFilesPhases()) { $0 + $1 }
 
         buildPhases += try target.preBuildScripts.map { try generateBuildScript(targetName: target.name, buildScript: $0) }
@@ -1083,20 +1100,15 @@ public class PBXProjGenerator {
             }
         }
 
-        let sourcesBuildPhaseFiles = getBuildFilesForPhase(.sources)
-        let shouldSkipSourcesBuildPhase = sourcesBuildPhaseFiles.isEmpty && target.type.canSkipCompileSourcesBuildPhase
-        if !shouldSkipSourcesBuildPhase {
-            let sourcesBuildPhase = addObject(PBXSourcesBuildPhase(files: sourcesBuildPhaseFiles))
-            buildPhases.append(sourcesBuildPhase)
+        if target.isResoursePhaseBeforeSourse {
+            appendResoursesBuildPhase()
+            appendSourcesBuildPhase()
+        } else {
+            appendSourcesBuildPhase()
+            appendResoursesBuildPhase()
         }
 
         buildPhases += try target.postCompileScripts.map { try generateBuildScript(targetName: target.name, buildScript: $0) }
-
-        let resourcesBuildPhaseFiles = getBuildFilesForPhase(.resources) + copyResourcesReferences
-        if !resourcesBuildPhaseFiles.isEmpty {
-            let resourcesBuildPhase = addObject(PBXResourcesBuildPhase(files: resourcesBuildPhaseFiles))
-            buildPhases.append(resourcesBuildPhase)
-        }
 
         let swiftObjCInterfaceHeader = project.getCombinedBuildSetting("SWIFT_OBJC_INTERFACE_HEADER_NAME", target: target, config: project.configs[0]) as? String
         let swiftInstallObjCHeader = project.getBoolBuildSetting("SWIFT_INSTALL_OBJC_HEADER", target: target, config: project.configs[0]) ?? true // Xcode default
